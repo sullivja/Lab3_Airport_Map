@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>.legend {
+        line-height: 16px;
+        width: 140px;
+        color: #333333;
+        font-family: 'Open Sans', Helvetica, sans-serif;
+        padding: 6px 8px;
+        background: white;
+        background: rgba(255,255,255,0.5);
+        box-shadow: 0 0 15px rgba(0,0,0,0.2);
+        border-radius: 5px;
+    }
+
+    .legend i {
+        width: 16px;
+        height: 16px;
+        float: left;
+        margin-right: 8px;
+        opacity: 0.9;
+    }
+
+    .legend img {
+        width: 16px;
+        height: 16px;
+        margin-right: 3px;
+        float: left;
+    }
+
+    .legend p {
+        font-size: 12px;
+        line-height: 16px;
+        margin: 0;
+    }</style>
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
+    <meta charset="UTF-8">
+    <title>Airports in the US </title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css"/>
+    <script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-ajax/2.1.0/leaflet.ajax.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js" ></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/1.3.4/chroma.min.js"></script>
+</head>
+<body>
+<!-- Our web map and content will go here -->
+<div id="map" style="width: 900px; height: 600px;"></divgeo
+<div id="credits">
+    <p> Fall 2017 | GEOG 371 | Geovisualization: Web Mapping &copy; Jake Sullivan, CEOAS, OSU </p>
+</div>
+<script>
+
+    // 1. Create a map object.
+    var mymap = L.map('map', {center: [44.13, -119.93], zoom: 3});
+
+    // 2. Add a base map.
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+        maxZoom: 11,
+        minZoom: 4,
+        detectRetina: true, //support Retina Display if the client uses high resolution monitor.
+        attribution: 'Airport Data Data &copy; Map Cruzin | US State attributed to Mike Bostock of D3 | Base Map &copy; CartoDB'
+    }).addTo(mymap);
+
+    // 3. Add airports GeoJSON Data
+    // Null variable that will hold airports data
+    var airports = null;
+    // Get GeoJSON and put on it on the map when it loads
+
+    // 4. build up a set of colors from colorbrewer's "set2" category
+    var colors = chroma.scale('Set2').mode('lch').colors(9);
+
+    // 5. dynamically append style classes to this page. This style classes will be used for colorize the markers.
+    for (i = 0; i < 9; i++) {
+        $('head').append($("<style> .marker-color-" + (i + 1).toString() + " { color: " + colors[i] + "; font-size: 15px; text-shadow: 0 0 3px #ffffff;} </style>"));
+    }
+
+    airports= L.geoJson.ajax("assets/airports.geojson", {
+        // assign a function to the onEachFeature parameter of the cellTowers object.
+        // Then each (point) feature will bind a popup window.
+        // The content of the popup window is the value of `feature.properties.company`
+        onEachFeature: function (feature, layer) {
+            layer.bindPopup(feature.properties.AIRPT_NAME);
+        },
+        pointToLayer: function (feature, latlng) {
+            var id = 0;
+            if (feature.properties.CNTL_TWR == "Y") { id = 0; }
+            else if (feature.properties.CNTL_TWR == "N")  { id = 1; }
+
+            return L.marker(latlng, {icon: L.divIcon({className: 'fa fa-plane marker-color-' + (id + 1).toString() })});
+        }
+
+    }).addTo(mymap);
+    // create the county layer
+
+    // Create an array of colors
+    colors = chroma.scale('OrRd').mode('hsl').colors(5); //colors = chroma.scale('OrRd').colors(5);
+
+    // setColor function will return a color value using an input value (the density)
+    function setColor(density) {
+        var id = 0;
+        if (density > 18) { id = 4; }
+        else if (density > 13 && density <= 18) { id = 3; }
+        else if (density > 10 && density <= 13) { id = 2; }
+        else if (density > 5 &&  density <= 10) { id = 1; }
+        else  { id = 0; }
+        return colors[id];
+    }
+    // Set style function that sets fill color property equal to cell tower density
+    //I'm not using this stuff but I'm afraid to take it out.
+    function style(feature) {
+        return {
+            fillColor: setColor(feature.properties.CT_CNT),
+            fillOpacity: 0.2,
+            weight: 2,
+            opacity: 1,
+            color: '#ffffff',
+            dashArray: '4'
+        };
+    }
+
+    // Add county polygons
+    L.geoJson.ajax("assets/us-states.geojson", {
+        style: style
+    }).addTo(mymap);
+
+    // Create Leaflet Control Object for Legend
+    var legend = L.control({position: 'topright'});
+
+    // Function that runs when legend is added to map
+    legend.onAdd = function () {
+
+        // Create Div Element and Populate it with HTML
+        var div = L.DomUtil.create('div', 'legend');
+
+
+        div.innerHTML += '<hr><b>Air Traffic Control Tower Status<b><br />';
+        div.innerHTML += '<i class="fa fa-plane marker-color-1"></i><p> With Air Traffic Control</p>';
+        div.innerHTML += '<i class="fa fa-plane marker-color-2"></i><p> Without Air Traffic Control</p>';
+
+        // Return the Legend div containing the HTML content
+        return div;
+    };
+
+    // Add a legend to map
+
+    legend.addTo(mymap);
+    // Add a scale bar to map
+    L.control.scale({position: 'bottomleft'}).addTo(mymap);
+
+</script>
+</body>
+</html>
